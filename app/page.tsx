@@ -127,6 +127,20 @@ export default function Home() {
           </div>
         )}
       </div>
+
+      {/* Navigation */}
+      <div className="mt-6 bg-white rounded-lg shadow p-6">
+        <h2 className="text-lg font-semibold mb-4">Modules</h2>
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={() => router.push('/sleep')}
+            className="p-4 border rounded-lg hover:bg-gray-100 transition text-center"
+          >
+            <span className="text-2xl">😴</span>
+            <p className="text-sm mt-1">Sommeil</p>
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

@@ -147,6 +147,14 @@ export default function Home() {
             <span className="text-2xl">🥗</span>
             <p className="text-sm mt-1">Nutrition</p>
           </button>
+
+          <button
+            onClick={() => router.push('/sport')}
+            className="p-4 border rounded-lg hover:bg-gray-100 transition text-center"
+          >
+            <span className="text-2xl">🏋️</span>
+            <p className="text-sm mt-1">Sport</p>
+          </button>
         </div>
       </div>
     </div>

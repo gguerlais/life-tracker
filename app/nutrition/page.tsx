@@ -100,7 +100,7 @@ export default function NutritionPage() {
   if (loading) return <div className="min-h-screen flex items-center justify-center">Chargement...</div>
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 max-w-lg mx-auto">
+    <div className="min-h-screen bg-gray-50 p-4 max-w-lg mx-auto pb-24">
       <div className="flex items-center gap-4 mb-8">
         <button onClick={() => router.push('/')} className="text-sm text-gray-500 underline">
           ← Retour

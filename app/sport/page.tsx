@@ -50,6 +50,7 @@ export default function SportPage() {
   const [loading, setLoading] = useState(true)
   const [exercises, setExercises] = useState<Exercise[]>([])
   const [sessions, setSessions] = useState<SportSession[]>([])
+  const [exerciseHistory, setExerciseHistory] = useState<Record<string, { sets: { reps: number | null; weight_kg: number | null; duration_min: number | null }[]; date: string }>>({})
 
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
   const [sessionType, setSessionType] = useState('')
@@ -75,6 +76,7 @@ export default function SportPage() {
         setUser(user)
         loadExercises()
         loadSessions(user.id)
+        loadExerciseHistory(user.id)
       }
       setLoading(false)
     })
@@ -95,9 +97,45 @@ export default function SportPage() {
     setSessions(data || [])
   }
 
-  const muscleGroups = [...new Set(exercises.map((e) => e.muscle_group))].sort((a, b) => a.localeCompare(b, 'fr'))
-  const filteredExercises = exercises.filter((e) => e.muscle_group === selectedGroup).sort((a, b) => a.name.localeCompare(b.name, 'fr'))
+  const loadExerciseHistory = async (userId: string) => {
+    const { data } = await supabase
+      .from('sport_session_exercises')
+      .select('exercise_id, set_number, reps, weight_kg, duration_min, sport_sessions!inner ( user_id, date )')
+      .eq('sport_sessions.user_id', userId)
+      .order('set_number', { ascending: true })
 
+    if (data) {
+      const byExercise: Record<string, { date: string; sets: typeof data }[]> = {}
+      for (const row of data) {
+        const exId = row.exercise_id
+        const date = (row.sport_sessions as unknown as { date: string }).date
+        if (!byExercise[exId]) byExercise[exId] = []
+        let session = byExercise[exId].find((s) => s.date === date)
+        if (!session) {
+          session = { date, sets: [] }
+          byExercise[exId].push(session)
+        }
+        session.sets.push(row)
+      }
+
+      const history: Record<string, { sets: { reps: number | null; weight_kg: number | null; duration_min: number | null }[]; date: string }> = {}
+      for (const [exId, sessions] of Object.entries(byExercise)) {
+        const latest = sessions.sort((a, b) => b.date.localeCompare(a.date))[0]
+        history[exId] = {
+          date: latest.date,
+          sets: latest.sets
+            .sort((a, b) => a.set_number - b.set_number)
+            .map((s) => ({ reps: s.reps, weight_kg: s.weight_kg, duration_min: s.duration_min })),
+        }
+      }
+      setExerciseHistory(history)
+    }
+  }
+
+  const muscleGroups = [...new Set(exercises.map((e) => e.muscle_group))].sort((a, b) => a.localeCompare(b, 'fr'))
+  const filteredExercises = exercises
+    .filter((e) => e.muscle_group === selectedGroup)
+    .sort((a, b) => a.name.localeCompare(b.name, 'fr'))
 
   const addExerciseBlock = () => {
     const exercise = exercises.find((e) => e.id === selectedExerciseId)
@@ -173,12 +211,15 @@ export default function SportPage() {
     setSessionNotes('')
     setSessionExercises([])
     loadSessions(user.id)
+    loadExerciseHistory(user.id)
   }
 
   const deleteSession = async (id: string) => {
-    // Les exercices sont supprimés automatiquement grâce à ON DELETE CASCADE
     await supabase.from('sport_sessions').delete().eq('id', id)
-    if (user) loadSessions(user.id)
+    if (user) {
+      loadSessions(user.id)
+      loadExerciseHistory(user.id)
+    }
   }
 
   const groupSessionExercises = (session: SportSession) => {
@@ -275,7 +316,11 @@ export default function SportPage() {
                   <div className="flex gap-2">
                     <select value={selectedExerciseId} onChange={(e) => setSelectedExerciseId(e.target.value)} className="flex-1 p-3 rounded-xl text-sm">
                       <option value="">-- Exercice --</option>
-                      {filteredExercises.map((ex) => (<option key={ex.id} value={ex.id}>{ex.name}</option>))}
+                      {filteredExercises.map((ex) => (
+                        <option key={ex.id} value={ex.id}>
+                          {ex.name}
+                        </option>
+                      ))}
                     </select>
                     {selectedExerciseId && (
                       <motion.button whileTap={{ scale: 0.95 }} onClick={addExerciseBlock} className="bg-[var(--accent-red)]/20 text-[var(--accent-red)] px-4 rounded-xl text-sm font-medium">
@@ -297,6 +342,12 @@ export default function SportPage() {
                     <span className="font-medium text-sm">{block.exercise_name}</span>
                     <button onClick={() => removeExerciseBlock(exIndex)} className="text-[var(--accent-red)] text-xs hover:underline">Supprimer</button>
                   </div>
+
+                  {exerciseHistory[block.exercise_id] && (
+                    <div className="bg-[var(--bg-card)] p-2 rounded-lg mb-3 text-[10px] text-[var(--text-tertiary)]">
+                      📋 Dernière fois ({new Date(exerciseHistory[block.exercise_id].date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}) : {exerciseHistory[block.exercise_id].sets.map((s, i) => `S${i + 1}: ${[s.reps && `${s.reps}r`, s.weight_kg && `${s.weight_kg}kg`, s.duration_min && `${s.duration_min}min`].filter(Boolean).join('×')}`).join(' · ')}
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-4 gap-2 mb-2 text-[10px] text-[var(--text-tertiary)] px-1">
                     <span>Série</span><span>Reps</span><span>Kg</span><span>Min</span>

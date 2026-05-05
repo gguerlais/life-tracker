@@ -4,6 +4,9 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { User } from '@supabase/supabase-js'
+import PageTransition from '../components/PageTransition'
+import Card from '../components/Card'
+import { motion } from 'framer-motion'
 
 const qualities = [
   { score: 1, emoji: '😫', label: 'Horrible' },
@@ -19,7 +22,6 @@ type SleepLog = {
   bedtime: string
   wake_time: string
   quality: number
-  created_at: string
 }
 
 function calculateDuration(bedtime: string, wakeTime: string): string {
@@ -67,11 +69,7 @@ export default function SleepPage() {
   const submitSleep = async () => {
     if (!user || quality === 0) return
     await supabase.from('sleep_logs').insert({
-      user_id: user.id,
-      date,
-      bedtime,
-      wake_time: wakeTime,
-      quality,
+      user_id: user.id, date, bedtime, wake_time: wakeTime, quality,
     })
     setQuality(0)
     loadLogs(user.id)
@@ -80,111 +78,97 @@ export default function SleepPage() {
   if (loading) return <div className="min-h-screen flex items-center justify-center">Chargement...</div>
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 max-w-lg mx-auto pb-24">
-      <div className="flex items-center gap-4 mb-8">
-        <button onClick={() => router.push('/')} className="text-sm text-gray-500 underline">
-          ← Retour
-        </button>
-        <h1 className="text-2xl font-bold">Sommeil</h1>
-      </div>
+    <PageTransition>
+      <div className="min-h-screen p-5 max-w-lg mx-auto pb-28">
+        <h1 className="text-3xl font-bold mb-8">😴 Sommeil</h1>
 
-      {/* Sleep input */}
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
-        <h2 className="text-lg font-semibold mb-4">Enregistrer une nuit</h2>
-
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">Date</label>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="w-full p-2 border rounded"
-            />
-          </div>
-
-          <div className="flex gap-4">
-            <div className="flex-1">
-              <label className="block text-sm text-gray-600 mb-1">Coucher</label>
-              <input
-                type="time"
-                value={bedtime}
-                onChange={(e) => setBedtime(e.target.value)}
-                className="w-full p-2 border rounded"
-              />
+        <Card className="mb-5">
+          <h2 className="text-lg font-semibold mb-5">Enregistrer une nuit</h2>
+          <div className="space-y-5">
+            <div>
+              <label className="block text-xs text-[var(--text-tertiary)] mb-1.5 ml-1">Date</label>
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full p-3 rounded-xl text-sm" />
             </div>
-            <div className="flex-1">
-              <label className="block text-sm text-gray-600 mb-1">Lever</label>
-              <input
-                type="time"
-                value={wakeTime}
-                onChange={(e) => setWakeTime(e.target.value)}
-                className="w-full p-2 border rounded"
-              />
-            </div>
-          </div>
 
-          <div>
-            <label className="block text-sm text-gray-600 mb-2">Qualité</label>
-            <div className="flex justify-between">
-              {qualities.map((q) => (
-                <button
-                  key={q.score}
-                  onClick={() => setQuality(q.score)}
-                  className={`flex flex-col items-center p-2 rounded-lg transition ${
-                    quality === q.score ? 'bg-blue-100 ring-2 ring-blue-400' : 'hover:bg-gray-100'
-                  }`}
+            <div className="flex gap-4">
+              <div className="flex-1">
+                <label className="block text-xs text-[var(--text-tertiary)] mb-1.5 ml-1">Coucher</label>
+                <input type="time" value={bedtime} onChange={(e) => setBedtime(e.target.value)} className="w-full p-3 rounded-xl text-sm" />
+              </div>
+              <div className="flex-1">
+                <label className="block text-xs text-[var(--text-tertiary)] mb-1.5 ml-1">Lever</label>
+                <input type="time" value={wakeTime} onChange={(e) => setWakeTime(e.target.value)} className="w-full p-3 rounded-xl text-sm" />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs text-[var(--text-tertiary)] mb-2 ml-1">Qualité</label>
+              <div className="flex justify-between">
+                {qualities.map((q) => (
+                  <motion.button
+                    key={q.score}
+                    whileTap={{ scale: 0.85 }}
+                    onClick={() => setQuality(q.score)}
+                    className={`flex flex-col items-center p-3 rounded-2xl transition-all duration-200 ${
+                      quality === q.score
+                        ? 'bg-[var(--accent-blue)]/20 ring-1 ring-[var(--accent-blue)]'
+                        : 'hover:bg-[var(--bg-card-hover)]'
+                    }`}
+                  >
+                    <span className="text-2xl">{q.emoji}</span>
+                    <span className="text-[10px] text-[var(--text-tertiary)] mt-1">{q.label}</span>
+                  </motion.button>
+                ))}
+              </div>
+            </div>
+
+            <div className="text-center py-2">
+              <span className="text-xs text-[var(--text-tertiary)]">Durée estimée : </span>
+              <span className="text-lg font-bold bg-gradient-to-r from-[var(--accent-blue)] to-[var(--accent-purple)] bg-clip-text text-transparent">
+                {calculateDuration(bedtime, wakeTime)}
+              </span>
+            </div>
+
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={submitSleep}
+              disabled={quality === 0}
+              className="w-full bg-[var(--accent-blue)] text-black font-medium p-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-30"
+            >
+              Enregistrer
+            </motion.button>
+          </div>
+        </Card>
+
+        <Card delay={0.1}>
+          <h2 className="text-lg font-semibold mb-4">7 dernières nuits</h2>
+          {logs.length === 0 ? (
+            <p className="text-[var(--text-tertiary)] text-sm">Aucune nuit enregistrée</p>
+          ) : (
+            <div className="space-y-2">
+              {logs.map((log, i) => (
+                <motion.div
+                  key={log.id}
+                  initial={{ opacity: 0, x: -12 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                  className="flex items-center justify-between text-sm bg-[var(--bg-secondary)] p-3 rounded-xl"
                 >
-                  <span className="text-2xl">{q.emoji}</span>
-                  <span className="text-xs text-gray-500 mt-1">{q.label}</span>
-                </button>
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg">{qualities.find((q) => q.score === log.quality)?.emoji}</span>
+                    <span className="text-[var(--text-secondary)]">
+                      {new Date(log.date).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })}
+                    </span>
+                  </div>
+                  <span className="text-[var(--text-tertiary)] text-xs">
+                    {log.bedtime.slice(0, 5)} → {log.wake_time.slice(0, 5)} · {calculateDuration(log.bedtime, log.wake_time)}
+                  </span>
+                </motion.div>
               ))}
             </div>
-          </div>
-
-          <div className="text-center text-sm text-gray-500">
-            Durée estimée : <strong>{calculateDuration(bedtime, wakeTime)}</strong>
-          </div>
-
-          <button
-            onClick={submitSleep}
-            disabled={quality === 0}
-            className="w-full bg-black text-white p-2 rounded hover:bg-gray-800 disabled:bg-gray-300"
-          >
-            Enregistrer
-          </button>
-        </div>
+          )}
+        </Card>
       </div>
-
-      {/* Recent logs */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg font-semibold mb-4">7 dernières nuits</h2>
-        {logs.length === 0 ? (
-          <p className="text-gray-400 text-sm">Aucune nuit enregistrée</p>
-        ) : (
-          <div className="space-y-3">
-            {logs.map((log) => (
-              <div key={log.id} className="flex items-center justify-between text-sm border-b pb-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">
-                    {qualities.find((q) => q.score === log.quality)?.emoji}
-                  </span>
-                  <span className="text-gray-600">
-                    {new Date(log.date).toLocaleDateString('fr-FR', {
-                      weekday: 'short',
-                      day: 'numeric',
-                      month: 'short',
-                    })}
-                  </span>
-                </div>
-                <div className="text-gray-500">
-                  {log.bedtime.slice(0, 5)} → {log.wake_time.slice(0, 5)} · {calculateDuration(log.bedtime, log.wake_time)}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
+    </PageTransition>
   )
 }

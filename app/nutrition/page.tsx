@@ -4,6 +4,9 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { User } from '@supabase/supabase-js'
+import PageTransition from '../components/PageTransition'
+import Card from '../components/Card'
+import { motion } from 'framer-motion'
 
 const mealTypes = [
   { value: 'petit-dej', label: '🌅 Petit-déj' },
@@ -100,152 +103,147 @@ export default function NutritionPage() {
   if (loading) return <div className="min-h-screen flex items-center justify-center">Chargement...</div>
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 max-w-lg mx-auto pb-24">
-      <div className="flex items-center gap-4 mb-8">
-        <button onClick={() => router.push('/')} className="text-sm text-gray-500 underline">
-          ← Retour
-        </button>
-        <h1 className="text-2xl font-bold">Nutrition</h1>
-      </div>
+    <PageTransition>
+      <div className="min-h-screen p-5 max-w-lg mx-auto pb-28">
+        <h1 className="text-3xl font-bold mb-8">🥗 Nutrition</h1>
 
-      {/* Nutrition input */}
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
-        <h2 className="text-lg font-semibold mb-4">Enregistrer un repas</h2>
-
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">Date</label>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="w-full p-2 border rounded"
-            />
-          </div>
-
-          {/* Meal type */}
-          <div>
-            <label className="block text-sm text-gray-600 mb-2">Repas</label>
-            <div className="grid grid-cols-2 gap-2">
-              {mealTypes.map((meal) => (
-                <button
-                  key={meal.value}
-                  onClick={() => setMealType(meal.value)}
-                  className={`p-2 border rounded-lg text-sm transition ${
-                    mealType === meal.value ? 'bg-blue-100 ring-2 ring-blue-400' : 'hover:bg-gray-100'
-                  }`}
-                >
-                  {meal.label}
-                </button>
-              ))}
+        <Card className="mb-5">
+          <h2 className="text-lg font-semibold mb-5">Enregistrer un repas</h2>
+          <div className="space-y-5">
+            <div>
+              <label className="block text-xs text-[var(--text-tertiary)] mb-1.5 ml-1">Date</label>
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full p-3 rounded-xl text-sm" />
             </div>
-          </div>
 
-          {/* Tags */}
-          <div>
-            <label className="block text-sm text-gray-600 mb-2">Tags</label>
-            <div className="flex flex-wrap gap-2">
-              {availableTags.map((tag) => (
-                <button
-                  key={tag}
-                  onClick={() => toggleTag(tag)}
-                  className={`px-3 py-1 rounded-full text-xs border transition ${
-                    selectedTags.includes(tag)
-                      ? 'bg-blue-100 border-blue-400 text-blue-700'
-                      : 'hover:bg-gray-100'
-                  }`}
-                >
-                  {tag}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Hydration */}
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="hydration"
-              checked={hydration}
-              onChange={(e) => setHydration(e.target.checked)}
-              className="rounded"
-            />
-            <label htmlFor="hydration" className="text-sm text-gray-600">
-              💧 Bien hydraté
-            </label>
-          </div>
-
-          {/* Score */}
-          <div>
-            <label className="block text-sm text-gray-600 mb-2">Score global</label>
-            <div className="flex justify-between">
-              {scores.map((s) => (
-                <button
-                  key={s.score}
-                  onClick={() => setScore(s.score)}
-                  className={`flex flex-col items-center p-2 rounded-lg transition ${
-                    score === s.score ? 'bg-blue-100 ring-2 ring-blue-400' : 'hover:bg-gray-100'
-                  }`}
-                >
-                  <span className="text-xl">{s.emoji}</span>
-                  <span className="text-xs text-gray-500 mt-1">{s.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Note */}
-          <input
-            type="text"
-            placeholder="Une note ? (optionnel)"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            className="w-full p-2 border rounded text-sm"
-          />
-
-          <button
-            onClick={submitNutrition}
-            disabled={!mealType || score === 0}
-            className="w-full bg-black text-white p-2 rounded hover:bg-gray-800 disabled:bg-gray-300"
-          >
-            Enregistrer
-          </button>
-        </div>
-      </div>
-
-      {/* Today's logs */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg font-semibold mb-4">Aujourd&apos;hui</h2>
-        {todayLogs.length === 0 ? (
-          <p className="text-gray-400 text-sm">Aucun repas enregistré</p>
-        ) : (
-          <div className="space-y-3">
-            {todayLogs.map((log) => (
-              <div key={log.id} className="border-b pb-3">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="font-medium">
-                    {mealTypes.find((m) => m.value === log.meal_type)?.label}
-                  </span>
-                  <span className="text-lg">
-                    {scores.find((s) => s.score === log.score)?.emoji}
-                  </span>
-                </div>
-                {log.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {log.tags.map((tag) => (
-                      <span key={tag} className="px-2 py-0.5 bg-gray-100 rounded-full text-xs text-gray-600">
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                {log.hydration && <span className="text-xs text-blue-500">💧 Hydraté</span>}
-                {log.note && <p className="text-xs text-gray-500 mt-1">{log.note}</p>}
+            <div>
+              <label className="block text-xs text-[var(--text-tertiary)] mb-2 ml-1">Repas</label>
+              <div className="grid grid-cols-2 gap-2">
+                {mealTypes.map((meal) => (
+                  <motion.button
+                    key={meal.value}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setMealType(meal.value)}
+                    className={`p-3 rounded-xl text-sm transition-all duration-200 ${
+                      mealType === meal.value
+                        ? 'bg-[var(--accent-orange)]/20 ring-1 ring-[var(--accent-orange)]'
+                        : 'bg-[var(--bg-secondary)] hover:bg-[var(--bg-card-hover)]'
+                    }`}
+                  >
+                    {meal.label}
+                  </motion.button>
+                ))}
               </div>
-            ))}
+            </div>
+
+            <div>
+              <label className="block text-xs text-[var(--text-tertiary)] mb-2 ml-1">Tags</label>
+              <div className="flex flex-wrap gap-2">
+                {availableTags.map((tag) => (
+                  <button
+                    key={tag}
+                    onClick={() => toggleTag(tag)}
+                    className={`px-3 py-1.5 rounded-full text-xs transition-all duration-200 ${
+                      selectedTags.includes(tag)
+                        ? 'bg-[var(--accent-orange)]/20 text-[var(--accent-orange)] ring-1 ring-[var(--accent-orange)]/50'
+                        : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:bg-[var(--bg-card-hover)]'
+                    }`}
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setHydration(!hydration)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm transition-all duration-200 ${
+                  hydration
+                    ? 'bg-[var(--accent-blue)]/20 ring-1 ring-[var(--accent-blue)]'
+                    : 'bg-[var(--bg-secondary)] hover:bg-[var(--bg-card-hover)]'
+                }`}
+              >
+                💧 Bien hydraté
+              </button>
+            </div>
+
+            <div>
+              <label className="block text-xs text-[var(--text-tertiary)] mb-2 ml-1">Score global</label>
+              <div className="flex justify-between">
+                {scores.map((s) => (
+                  <motion.button
+                    key={s.score}
+                    whileTap={{ scale: 0.85 }}
+                    onClick={() => setScore(s.score)}
+                    className={`flex flex-col items-center p-3 rounded-2xl transition-all duration-200 ${
+                      score === s.score
+                        ? 'bg-[var(--accent-orange)]/20 ring-1 ring-[var(--accent-orange)]'
+                        : 'hover:bg-[var(--bg-card-hover)]'
+                    }`}
+                  >
+                    <span className="text-xl">{s.emoji}</span>
+                    <span className="text-[10px] text-[var(--text-tertiary)] mt-1">{s.label}</span>
+                  </motion.button>
+                ))}
+              </div>
+            </div>
+
+            <input
+              type="text"
+              placeholder="Une note ? (optionnel)"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              className="w-full p-3 rounded-xl text-sm"
+            />
+
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={submitNutrition}
+              disabled={!mealType || score === 0}
+              className="w-full bg-[var(--accent-orange)] text-black font-medium p-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-30"
+            >
+              Enregistrer
+            </motion.button>
           </div>
-        )}
+        </Card>
+
+        <Card delay={0.1}>
+          <h2 className="text-lg font-semibold mb-4">Aujourd&apos;hui</h2>
+          {todayLogs.length === 0 ? (
+            <p className="text-[var(--text-tertiary)] text-sm">Aucun repas enregistré</p>
+          ) : (
+            <div className="space-y-3">
+              {todayLogs.map((log, i) => (
+                <motion.div
+                  key={log.id}
+                  initial={{ opacity: 0, x: -12 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                  className="bg-[var(--bg-secondary)] p-4 rounded-xl"
+                >
+                  <div className="flex items-center justify-between text-sm mb-2">
+                    <span className="font-medium">
+                      {mealTypes.find((m) => m.value === log.meal_type)?.label}
+                    </span>
+                    <span className="text-lg">{scores.find((s) => s.score === log.score)?.emoji}</span>
+                  </div>
+                  {log.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {log.tags.map((tag) => (
+                        <span key={tag} className="px-2 py-0.5 bg-[var(--bg-card)] rounded-full text-[10px] text-[var(--text-tertiary)]">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {log.hydration && <span className="text-xs text-[var(--accent-blue)]">💧 Hydraté</span>}
+                  {log.note && <p className="text-xs text-[var(--text-tertiary)] mt-1">{log.note}</p>}
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </Card>
       </div>
-    </div>
+    </PageTransition>
   )
 }

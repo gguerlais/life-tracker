@@ -4,13 +4,16 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { User } from '@supabase/supabase-js'
+import PageTransition from '../components/PageTransition'
+import Card from '../components/Card'
+import { motion } from 'framer-motion'
 
 const moods = [
-  { score: 1, emoji: '😞', label: 'Très mal' },
-  { score: 2, emoji: '😕', label: 'Pas top' },
-  { score: 3, emoji: '😐', label: 'Neutre' },
-  { score: 4, emoji: '🙂', label: 'Bien' },
-  { score: 5, emoji: '😄', label: 'Super' },
+  { score: 1, emoji: '😞', label: 'Très mal', color: 'from-red-500/20 to-red-600/20' },
+  { score: 2, emoji: '😕', label: 'Pas top', color: 'from-orange-500/20 to-orange-600/20' },
+  { score: 3, emoji: '😐', label: 'Neutre', color: 'from-yellow-500/20 to-yellow-600/20' },
+  { score: 4, emoji: '🙂', label: 'Bien', color: 'from-green-500/20 to-green-600/20' },
+  { score: 5, emoji: '😄', label: 'Super', color: 'from-emerald-500/20 to-emerald-600/20' },
 ]
 
 type MoodCheck = {
@@ -26,6 +29,7 @@ export default function MoodPage() {
   const [note, setNote] = useState('')
   const [todayMoods, setTodayMoods] = useState<MoodCheck[]>([])
   const [weekMoods, setWeekMoods] = useState<MoodCheck[]>([])
+  const [justSubmitted, setJustSubmitted] = useState<number | null>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -63,6 +67,7 @@ export default function MoodPage() {
 
   const submitMood = async (score: number) => {
     if (!user) return
+    setJustSubmitted(score)
     await supabase.from('mood_checks').insert({
       user_id: user.id,
       score,
@@ -70,6 +75,7 @@ export default function MoodPage() {
     })
     setNote('')
     loadMoods(user.id)
+    setTimeout(() => setJustSubmitted(null), 800)
   }
 
   const weekAvg = weekMoods.length > 0
@@ -79,68 +85,79 @@ export default function MoodPage() {
   if (loading) return <div className="min-h-screen flex items-center justify-center">Chargement...</div>
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 max-w-lg mx-auto pb-24">
-      <h1 className="text-2xl font-bold mb-6">🧠 Mood</h1>
+    <PageTransition>
+      <div className="min-h-screen p-5 max-w-lg mx-auto pb-28">
+        <h1 className="text-3xl font-bold mb-8">🧠 Mood</h1>
 
-      {/* Mood input */}
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
-        <h2 className="text-lg font-semibold mb-4">Comment tu te sens ?</h2>
-        <div className="flex justify-between mb-4">
-          {moods.map((mood) => (
-            <button
-              key={mood.score}
-              onClick={() => submitMood(mood.score)}
-              className="flex flex-col items-center p-2 rounded-lg hover:bg-gray-100 transition"
-            >
-              <span className="text-3xl">{mood.emoji}</span>
-              <span className="text-xs text-gray-500 mt-1">{mood.label}</span>
-            </button>
-          ))}
-        </div>
-        <input
-          type="text"
-          placeholder="Une note ? (optionnel)"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          className="w-full p-2 border rounded text-sm"
-        />
-      </div>
-
-      {/* Week average */}
-      {weekAvg && (
-        <div className="bg-purple-50 rounded-lg shadow p-4 mb-6 text-center">
-          <p className="text-sm text-gray-500">Moyenne sur 7 jours</p>
-          <p className="text-3xl font-bold text-purple-600">{weekAvg} / 5</p>
-          <p className="text-lg">{moods.find((m) => m.score === Math.round(Number(weekAvg)))?.emoji}</p>
-        </div>
-      )}
-
-      {/* Today's moods */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg font-semibold mb-4">Aujourd&apos;hui</h2>
-        {todayMoods.length === 0 ? (
-          <p className="text-gray-400 text-sm">Aucun check pour le moment</p>
-        ) : (
-          <div className="space-y-3">
-            {todayMoods.map((mood) => (
-              <div key={mood.id} className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2">
-                  <span className="text-xl">
-                    {moods.find((m) => m.score === mood.score)?.emoji}
-                  </span>
-                  {mood.note && <span className="text-gray-600">{mood.note}</span>}
-                </div>
-                <span className="text-gray-400">
-                  {new Date(mood.created_at).toLocaleTimeString('fr-FR', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </span>
-              </div>
+        {/* Mood input */}
+        <Card className="mb-5">
+          <h2 className="text-lg font-semibold mb-5">Comment tu te sens ?</h2>
+          <div className="flex justify-between mb-5">
+            {moods.map((mood) => (
+              <motion.button
+                key={mood.score}
+                whileTap={{ scale: 0.85 }}
+                onClick={() => submitMood(mood.score)}
+                className={`flex flex-col items-center p-3 rounded-2xl transition-all duration-200 bg-gradient-to-b ${
+                  justSubmitted === mood.score ? mood.color + ' scale-110' : 'hover:bg-[var(--bg-card-hover)]'
+                }`}
+              >
+                <span className="text-3xl">{mood.emoji}</span>
+                <span className="text-[10px] text-[var(--text-tertiary)] mt-1.5">{mood.label}</span>
+              </motion.button>
             ))}
           </div>
+          <input
+            type="text"
+            placeholder="Une note ? (optionnel)"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            className="w-full p-3 rounded-xl text-sm"
+          />
+        </Card>
+
+        {/* Week average */}
+        {weekAvg && (
+          <Card className="mb-5 text-center" delay={0.1}>
+            <p className="text-xs text-[var(--text-tertiary)]">Moyenne sur 7 jours</p>
+            <p className="text-4xl font-bold bg-gradient-to-r from-[var(--accent-purple)] to-[var(--accent-blue)] bg-clip-text text-transparent mt-2">
+              {weekAvg}
+            </p>
+            <p className="text-2xl mt-1">{moods.find((m) => m.score === Math.round(Number(weekAvg)))?.emoji}</p>
+          </Card>
         )}
+
+        {/* Today's moods */}
+        <Card delay={0.2}>
+          <h2 className="text-lg font-semibold mb-4">Aujourd&apos;hui</h2>
+          {todayMoods.length === 0 ? (
+            <p className="text-[var(--text-tertiary)] text-sm">Aucun check pour le moment</p>
+          ) : (
+            <div className="space-y-3">
+              {todayMoods.map((mood, i) => (
+                <motion.div
+                  key={mood.id}
+                  initial={{ opacity: 0, x: -12 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                  className="flex items-center justify-between text-sm bg-[var(--bg-secondary)] p-3 rounded-xl"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-xl">{moods.find((m) => m.score === mood.score)?.emoji}</span>
+                    {mood.note && <span className="text-[var(--text-secondary)]">{mood.note}</span>}
+                  </div>
+                  <span className="text-[var(--text-tertiary)] text-xs">
+                    {new Date(mood.created_at).toLocaleTimeString('fr-FR', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </span>
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </Card>
       </div>
-    </div>
+    </PageTransition>
   )
 }

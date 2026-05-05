@@ -95,8 +95,9 @@ export default function SportPage() {
     setSessions(data || [])
   }
 
-  const muscleGroups = [...new Set(exercises.map((e) => e.muscle_group))]
-  const filteredExercises = exercises.filter((e) => e.muscle_group === selectedGroup)
+  const muscleGroups = [...new Set(exercises.map((e) => e.muscle_group))].sort((a, b) => a.localeCompare(b, 'fr'))
+  const filteredExercises = exercises.filter((e) => e.muscle_group === selectedGroup).sort((a, b) => a.name.localeCompare(b.name, 'fr'))
+
 
   const addExerciseBlock = () => {
     const exercise = exercises.find((e) => e.id === selectedExerciseId)
@@ -218,7 +219,12 @@ export default function SportPage() {
                   <motion.button
                     key={t}
                     whileTap={{ scale: 0.95 }}
-                    onClick={() => setSessionType(t)}
+                    onClick={() => {
+                      setSessionType(t)
+                      if (t === 'Cardio') setSelectedGroup('Cardio')
+                      else if (t === 'Mobilité') setSelectedGroup('Mobilité')
+                      else setSelectedGroup('')
+                    }}
                     className={`px-4 py-2 rounded-xl text-sm transition-all duration-200 ${
                       sessionType === t
                         ? 'bg-[var(--accent-red)]/20 ring-1 ring-[var(--accent-red)]'

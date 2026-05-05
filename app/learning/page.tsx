@@ -91,6 +91,19 @@ export default function LearningPage() {
     loadSessions(user.id)
   }
 
+  const deleteSession = async (id: string) => {
+    await supabase.from('learning_sessions').delete().eq('id', id)
+    if (user) loadSessions(user.id)
+  }
+
+  const deleteTopic = async (id: string) => {
+    await supabase.from('learning_topics').delete().eq('id', id)
+    if (user) {
+      loadTopics(user.id)
+      loadSessions(user.id)
+    }
+  }
+
   const totalTimeByTopic = (topicId: string) => {
     return sessions.filter((s) => s.topic_id === topicId).reduce((sum, s) => sum + s.duration_min, 0)
   }
@@ -180,9 +193,12 @@ export default function LearningPage() {
                         <span className="font-medium">{s.learning_topics?.name}</span>
                         {s.notes && <p className="text-[11px] text-[var(--text-tertiary)]">{s.notes}</p>}
                       </div>
-                      <div className="text-right text-[var(--text-tertiary)] text-xs">
-                        <div>{s.duration_min} min</div>
-                        <div>{new Date(s.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</div>
+                      <div className="flex items-center gap-3">
+                        <div className="text-right text-[var(--text-tertiary)] text-xs">
+                          <div>{s.duration_min} min</div>
+                          <div>{new Date(s.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</div>
+                        </div>
+                        <button onClick={() => deleteSession(s.id)} className="text-[var(--accent-red)]/50 hover:text-[var(--accent-red)] text-xs transition-colors">✕</button>
                       </div>
                     </motion.div>
                   ))}
@@ -211,9 +227,9 @@ export default function LearningPage() {
             </Card>
 
             {[
-              { title: '🔥 En cours', items: activeTopics, color: 'var(--accent-red)' },
-              { title: '📋 À explorer', items: backlogTopics, color: 'var(--accent-orange)' },
-              { title: '✅ Maîtrisé', items: doneTopics, color: 'var(--accent-green)' },
+              { title: '🔥 En cours', items: activeTopics },
+              { title: '📋 À explorer', items: backlogTopics },
+              { title: '✅ Maîtrisé', items: doneTopics },
             ].map((group, gi) => (
               <Card key={group.title} className="mb-4" delay={gi * 0.1}>
                 <h2 className="text-lg font-semibold mb-3">{group.title}</h2>
@@ -235,15 +251,18 @@ export default function LearningPage() {
                             {topic.description && <p className="text-[11px] text-[var(--text-tertiary)]">{topic.description}</p>}
                             <p className="text-[11px] text-[var(--text-tertiary)] mt-1">⏱ {totalTimeByTopic(topic.id)} min</p>
                           </div>
-                          <select
-                            value={topic.status}
-                            onChange={(e) => updateTopicStatus(topic.id, e.target.value)}
-                            className="text-xs rounded-lg p-1.5"
-                          >
-                            <option value="backlog">À explorer</option>
-                            <option value="active">En cours</option>
-                            <option value="done">Maîtrisé</option>
-                          </select>
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={topic.status}
+                              onChange={(e) => updateTopicStatus(topic.id, e.target.value)}
+                              className="text-xs rounded-lg p-1.5"
+                            >
+                              <option value="backlog">À explorer</option>
+                              <option value="active">En cours</option>
+                              <option value="done">Maîtrisé</option>
+                            </select>
+                            <button onClick={() => deleteTopic(topic.id)} className="text-[var(--accent-red)]/50 hover:text-[var(--accent-red)] text-xs transition-colors">✕</button>
+                          </div>
                         </div>
                       </motion.div>
                     ))}

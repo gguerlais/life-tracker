@@ -100,6 +100,11 @@ export default function NutritionPage() {
     loadLogs(user.id)
   }
 
+  const deleteNutrition = async (id: string) => {
+    await supabase.from('nutrition_logs').delete().eq('id', id)
+    if (user) loadLogs(user.id)
+  }
+
   if (loading) return <div className="min-h-screen flex items-center justify-center">Chargement...</div>
 
   return (
@@ -225,7 +230,10 @@ export default function NutritionPage() {
                     <span className="font-medium">
                       {mealTypes.find((m) => m.value === log.meal_type)?.label}
                     </span>
-                    <span className="text-lg">{scores.find((s) => s.score === log.score)?.emoji}</span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-lg">{scores.find((s) => s.score === log.score)?.emoji}</span>
+                      <button onClick={() => deleteNutrition(log.id)} className="text-[var(--accent-red)]/50 hover:text-[var(--accent-red)] text-xs transition-colors">✕</button>
+                    </div>
                   </div>
                   {log.tags.length > 0 && (
                     <div className="flex flex-wrap gap-1 mb-2">

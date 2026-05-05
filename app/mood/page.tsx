@@ -78,6 +78,11 @@ export default function MoodPage() {
     setTimeout(() => setJustSubmitted(null), 800)
   }
 
+  const deleteMood = async (id: string) => {
+    await supabase.from('mood_checks').delete().eq('id', id)
+    if (user) loadMoods(user.id)
+  }
+
   const weekAvg = weekMoods.length > 0
     ? (weekMoods.reduce((a, b) => a + b.score, 0) / weekMoods.length).toFixed(1)
     : null
@@ -146,12 +151,12 @@ export default function MoodPage() {
                     <span className="text-xl">{moods.find((m) => m.score === mood.score)?.emoji}</span>
                     {mood.note && <span className="text-[var(--text-secondary)]">{mood.note}</span>}
                   </div>
-                  <span className="text-[var(--text-tertiary)] text-xs">
-                    {new Date(mood.created_at).toLocaleTimeString('fr-FR', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-[var(--text-tertiary)] text-xs">
+                      {new Date(mood.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                    <button onClick={() => deleteMood(mood.id)} className="text-[var(--accent-red)]/50 hover:text-[var(--accent-red)] text-xs transition-colors">✕</button>
+                  </div>
                 </motion.div>
               ))}
             </div>

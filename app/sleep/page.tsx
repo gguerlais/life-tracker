@@ -75,6 +75,11 @@ export default function SleepPage() {
     loadLogs(user.id)
   }
 
+  const deleteSleep = async (id: string) => {
+    await supabase.from('sleep_logs').delete().eq('id', id)
+    if (user) loadLogs(user.id)
+  }
+
   if (loading) return <div className="min-h-screen flex items-center justify-center">Chargement...</div>
 
   return (
@@ -160,9 +165,12 @@ export default function SleepPage() {
                       {new Date(log.date).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })}
                     </span>
                   </div>
-                  <span className="text-[var(--text-tertiary)] text-xs">
-                    {log.bedtime.slice(0, 5)} → {log.wake_time.slice(0, 5)} · {calculateDuration(log.bedtime, log.wake_time)}
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-[var(--text-tertiary)] text-xs">
+                      {log.bedtime.slice(0, 5)} → {log.wake_time.slice(0, 5)} · {calculateDuration(log.bedtime, log.wake_time)}
+                    </span>
+                    <button onClick={() => deleteSleep(log.id)} className="text-[var(--accent-red)]/50 hover:text-[var(--accent-red)] text-xs transition-colors">✕</button>
+                  </div>
                 </motion.div>
               ))}
             </div>

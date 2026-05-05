@@ -174,6 +174,12 @@ export default function SportPage() {
     loadSessions(user.id)
   }
 
+  const deleteSession = async (id: string) => {
+    // Les exercices sont supprimés automatiquement grâce à ON DELETE CASCADE
+    await supabase.from('sport_sessions').delete().eq('id', id)
+    if (user) loadSessions(user.id)
+  }
+
   const groupSessionExercises = (session: SportSession) => {
     const groups: Record<string, { name: string; sets: typeof session.sport_session_exercises }> = {}
     for (const ex of session.sport_session_exercises) {
@@ -341,7 +347,10 @@ export default function SportPage() {
                       {new Date(session.date).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })}
                       {' · '}{session.type}
                     </span>
-                    {session.duration_min && <span className="text-[var(--text-tertiary)] text-xs">{session.duration_min} min</span>}
+                    <div className="flex items-center gap-3">
+                      {session.duration_min && <span className="text-[var(--text-tertiary)] text-xs">{session.duration_min} min</span>}
+                      <button onClick={() => deleteSession(session.id)} className="text-[var(--accent-red)]/50 hover:text-[var(--accent-red)] text-xs transition-colors">✕</button>
+                    </div>
                   </div>
                   {groupSessionExercises(session).map((group, gi) => (
                     <div key={gi} className="ml-2 mb-2">

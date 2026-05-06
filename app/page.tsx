@@ -13,8 +13,7 @@ const modules = [
   { path: '/nutrition', emoji: '🥗', label: 'Nutrition', desc: 'Enregistre un repas', gradient: 'from-orange-500/20 to-yellow-500/20', border: 'hover:border-orange-500/50' },
   { path: '/sport', emoji: '🏋️', label: 'Sport', desc: 'Logge une séance', gradient: 'from-red-500/20 to-orange-500/20', border: 'hover:border-red-500/50' },
   { path: '/learning', emoji: '📚', label: 'Apprentissage', desc: "Session d'étude", gradient: 'from-indigo-500/20 to-blue-500/20', border: 'hover:border-indigo-500/50' },
-  { path: '/dashboard', emoji: '📊', label: 'Dashboard', desc: 'Tes tendances', gradient: 'from-green-500/20 to-emerald-500/20', border: 'hover:border-green-500/50' },
-]
+  { path: '/analytics', emoji: '📊', label: 'Analytics', desc: 'Tes tendances', gradient: 'from-green-500/20 to-emerald-500/20', border: 'hover:border-green-500/50' },]
 
 export default function Home() {
   const [user, setUser] = useState<User | null>(null)

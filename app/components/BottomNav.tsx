@@ -10,7 +10,7 @@ const navItems = [
   { path: '/nutrition', label: 'Nutrition', emoji: '🥗' },
   { path: '/sport', label: 'Sport', emoji: '🏋️' },
   { path: '/learning', label: 'Apprendre', emoji: '📚' },
-  { path: '/dashboard', label: 'Stats', emoji: '📊' },
+  { path: '/analytics', label: 'Analytics', emoji: '📊' },
 ]
 
 export default function BottomNav() {

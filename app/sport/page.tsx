@@ -21,6 +21,7 @@ type SetEntry = {
   weight_kg: string
   reps: string
   duration_min: string
+  duration_unit: string
   rpe: string
   intensity_zone: string
 }
@@ -46,6 +47,7 @@ type CircuitExercise = {
   weight_kg: string
   reps: string
   duration_min: string
+  duration_unit: string
   rpe: string
   intensity_zone: string
 }
@@ -60,10 +62,12 @@ type SessionItem = ExerciseBlock | CircuitBlock
 
 type DBExerciseRow = {
   id: string
+  exercise_id: string
   set_number: number
   reps: number | null
   weight_kg: number | null
   duration_min: number | null
+  duration_unit: string | null
   rpe: number | null
   intensity_zone: string | null
   contraction_type: string | null
@@ -87,6 +91,7 @@ type HistorySet = {
   reps: number | null
   weight_kg: number | null
   duration_min: number | null
+  duration_unit: string | null
   rpe: number | null
   intensity_zone: string | null
 }
@@ -110,15 +115,8 @@ const equipmentTypes = [
 ]
 
 const zones = ['Z1', 'Z2', 'Z3', 'Z4', 'Z5']
-const zoneColors: Record<string, string> = {
-  Z1: 'text-[var(--accent-blue)]',
-  Z2: 'text-[var(--accent-green)]',
-  Z3: 'text-[var(--accent-orange)]',
-  Z4: 'text-[var(--accent-red)]',
-  Z5: 'text-[var(--accent-pink)]',
-}
 
-const emptySet = (): SetEntry => ({ weight_kg: '', reps: '', duration_min: '', rpe: '', intensity_zone: '' })
+const emptySet = (): SetEntry => ({ weight_kg: '', reps: '', duration_min: '', duration_unit: 'min', rpe: '', intensity_zone: '' })
 
 // ─── COMPONENT ───
 
@@ -134,6 +132,7 @@ export default function SportPage() {
   const [durationMin, setDurationMin] = useState('')
   const [sessionNotes, setSessionNotes] = useState('')
   const [sessionItems, setSessionItems] = useState<SessionItem[]>([])
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null)
 
   const [selectedGroup, setSelectedGroup] = useState('')
   const [selectedExerciseId, setSelectedExerciseId] = useState('')
@@ -143,7 +142,6 @@ export default function SportPage() {
   const [customGroup, setCustomGroup] = useState('')
   const [customCategory, setCustomCategory] = useState('muscu')
 
-  // Circuit inline selectors
   const [circuitSelGroup, setCircuitSelGroup] = useState<Record<number, string>>({})
   const [circuitSelExercise, setCircuitSelExercise] = useState<Record<number, string>>({})
 
@@ -171,7 +169,7 @@ export default function SportPage() {
   const loadSessions = async (userId: string) => {
     const { data } = await supabase
       .from('sport_sessions')
-      .select('*, sport_session_exercises ( id, set_number, reps, weight_kg, duration_min, rpe, intensity_zone, contraction_type, is_unilateral, equipment_type, circuit_group, circuit_rounds, exercises_library ( name, category ) )')
+      .select('*, sport_session_exercises ( id, exercise_id, set_number, reps, weight_kg, duration_min, duration_unit, rpe, intensity_zone, contraction_type, is_unilateral, equipment_type, circuit_group, circuit_rounds, exercises_library ( name, category ) )')
       .eq('user_id', userId)
       .order('date', { ascending: false })
       .limit(5)
@@ -181,7 +179,7 @@ export default function SportPage() {
   const loadExerciseHistory = async (userId: string) => {
     const { data } = await supabase
       .from('sport_session_exercises')
-      .select('exercise_id, set_number, reps, weight_kg, duration_min, rpe, intensity_zone, sport_sessions!inner ( user_id, date )')
+      .select('exercise_id, set_number, reps, weight_kg, duration_min, duration_unit, rpe, intensity_zone, sport_sessions!inner ( user_id, date )')
       .eq('sport_sessions.user_id', userId)
       .order('set_number', { ascending: true })
 
@@ -201,7 +199,8 @@ export default function SportPage() {
         history[exId] = {
           date: latest.date,
           sets: latest.sets.sort((a, b) => a.set_number - b.set_number).map((s) => ({
-            reps: s.reps, weight_kg: s.weight_kg, duration_min: s.duration_min, rpe: s.rpe, intensity_zone: s.intensity_zone,
+            reps: s.reps, weight_kg: s.weight_kg, duration_min: s.duration_min,
+            duration_unit: s.duration_unit, rpe: s.rpe, intensity_zone: s.intensity_zone,
           })),
         }
       }
@@ -291,7 +290,7 @@ export default function SportPage() {
       contraction_type: ex.category === 'muscu' ? 'concentrique' : '',
       is_unilateral: false,
       equipment_type: ex.category === 'muscu' ? 'barre' : '',
-      weight_kg: '', reps: '', duration_min: '', rpe: '', intensity_zone: '',
+      weight_kg: '', reps: '', duration_min: '', duration_unit: 'min', rpe: '', intensity_zone: '',
     })
     setSessionItems(items)
     setCircuitSelExercise({ ...circuitSelExercise, [ci]: '' })
@@ -312,6 +311,88 @@ export default function SportPage() {
     setSessionItems(items)
   }
 
+  // ─── EDIT SESSION ───
+
+  const startEditing = (session: SportSession) => {
+    setEditingSessionId(session.id)
+    setDate(session.date)
+    setSessionType(session.type)
+    setDurationMin(session.duration_min?.toString() || '')
+    setSessionNotes(session.notes || '')
+
+    const items: SessionItem[] = []
+
+    const regularExercises = session.sport_session_exercises.filter((e) => !e.circuit_group)
+    const regularGroups = new Map<string, DBExerciseRow[]>()
+    for (const ex of regularExercises) {
+      const key = ex.exercise_id
+      if (!regularGroups.has(key)) regularGroups.set(key, [])
+      regularGroups.get(key)!.push(ex)
+    }
+
+    for (const [exId, sets] of regularGroups) {
+      const first = sets[0]
+      items.push({
+        type: 'exercise',
+        exercise_id: exId,
+        exercise_name: first.exercises_library?.name || 'Inconnu',
+        category: first.exercises_library?.category || 'muscu',
+        contraction_type: first.contraction_type || 'concentrique',
+        is_unilateral: first.is_unilateral,
+        equipment_type: first.equipment_type || 'barre',
+        sets: sets.sort((a, b) => a.set_number - b.set_number).map((s) => ({
+          weight_kg: s.weight_kg?.toString() || '',
+          reps: s.reps?.toString() || '',
+          duration_min: s.duration_min?.toString() || '',
+          duration_unit: s.duration_unit || 'min',
+          rpe: s.rpe?.toString() || '',
+          intensity_zone: s.intensity_zone || '',
+        })),
+      })
+    }
+
+    const circuitExercises = session.sport_session_exercises.filter((e) => e.circuit_group)
+    const circuitGroups = new Map<number, DBExerciseRow[]>()
+    for (const ex of circuitExercises) {
+      if (!circuitGroups.has(ex.circuit_group!)) circuitGroups.set(ex.circuit_group!, [])
+      circuitGroups.get(ex.circuit_group!)!.push(ex)
+    }
+
+    for (const [, exs] of circuitGroups) {
+      const first = exs[0]
+      items.push({
+        type: 'circuit',
+        rounds: first.circuit_rounds?.toString() || '3',
+        exercises: exs.sort((a, b) => a.set_number - b.set_number).map((ex) => ({
+          exercise_id: ex.exercise_id,
+          exercise_name: ex.exercises_library?.name || 'Inconnu',
+          category: ex.exercises_library?.category || 'muscu',
+          contraction_type: ex.contraction_type || '',
+          is_unilateral: ex.is_unilateral,
+          equipment_type: ex.equipment_type || '',
+          weight_kg: ex.weight_kg?.toString() || '',
+          reps: ex.reps?.toString() || '',
+          duration_min: ex.duration_min?.toString() || '',
+          duration_unit: ex.duration_unit || 'min',
+          rpe: ex.rpe?.toString() || '',
+          intensity_zone: ex.intensity_zone || '',
+        })),
+      })
+    }
+
+    setSessionItems(items)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const cancelEditing = () => {
+    setEditingSessionId(null)
+    setSessionType('')
+    setDurationMin('')
+    setSessionNotes('')
+    setSessionItems([])
+    setDate(new Date().toISOString().split('T')[0])
+  }
+
   // ─── CUSTOM EXERCISE ───
 
   const addCustomExercise = async () => {
@@ -325,17 +406,8 @@ export default function SportPage() {
 
   // ─── SUBMIT ───
 
-  const submitSession = async () => {
-    if (!user || !sessionType) return
-    const { data: session } = await supabase
-      .from('sport_sessions')
-      .insert({ user_id: user.id, date, type: sessionType, duration_min: durationMin ? parseInt(durationMin) : null, notes: sessionNotes || null })
-      .select().single()
-
-    if (!session) return
-
+  const buildExerciseRows = (sessionId: string) => {
     const rows: Record<string, unknown>[] = []
-
     let circuitGroupCounter = 0
 
     for (const item of sessionItems) {
@@ -343,10 +415,11 @@ export default function SportPage() {
         for (let i = 0; i < item.sets.length; i++) {
           const s = item.sets[i]
           rows.push({
-            session_id: session.id, exercise_id: item.exercise_id, set_number: i + 1,
+            session_id: sessionId, exercise_id: item.exercise_id, set_number: i + 1,
             reps: s.reps ? parseInt(s.reps) : null,
             weight_kg: s.weight_kg ? parseFloat(s.weight_kg) : null,
             duration_min: s.duration_min ? parseInt(s.duration_min) : null,
+            duration_unit: s.duration_unit || null,
             rpe: s.rpe ? parseInt(s.rpe) : null,
             intensity_zone: s.intensity_zone || null,
             contraction_type: item.contraction_type || null,
@@ -360,10 +433,11 @@ export default function SportPage() {
         for (let i = 0; i < item.exercises.length; i++) {
           const ex = item.exercises[i]
           rows.push({
-            session_id: session.id, exercise_id: ex.exercise_id, set_number: i + 1,
+            session_id: sessionId, exercise_id: ex.exercise_id, set_number: i + 1,
             reps: ex.reps ? parseInt(ex.reps) : null,
             weight_kg: ex.weight_kg ? parseFloat(ex.weight_kg) : null,
             duration_min: ex.duration_min ? parseInt(ex.duration_min) : null,
+            duration_unit: ex.duration_unit || null,
             rpe: ex.rpe ? parseInt(ex.rpe) : null,
             intensity_zone: ex.intensity_zone || null,
             contraction_type: ex.contraction_type || null,
@@ -375,10 +449,39 @@ export default function SportPage() {
         }
       }
     }
+    return rows
+  }
 
-    if (rows.length > 0) await supabase.from('sport_session_exercises').insert(rows)
+  const submitSession = async () => {
+    if (!user || !sessionType) return
+
+    if (editingSessionId) {
+      await supabase.from('sport_sessions').update({
+        date, type: sessionType,
+        duration_min: durationMin ? parseInt(durationMin) : null,
+        notes: sessionNotes || null,
+      }).eq('id', editingSessionId)
+
+      await supabase.from('sport_session_exercises').delete().eq('session_id', editingSessionId)
+
+      const rows = buildExerciseRows(editingSessionId)
+      if (rows.length > 0) await supabase.from('sport_session_exercises').insert(rows)
+
+      setEditingSessionId(null)
+    } else {
+      const { data: session } = await supabase
+        .from('sport_sessions')
+        .insert({ user_id: user.id, date, type: sessionType, duration_min: durationMin ? parseInt(durationMin) : null, notes: sessionNotes || null })
+        .select().single()
+
+      if (session) {
+        const rows = buildExerciseRows(session.id)
+        if (rows.length > 0) await supabase.from('sport_session_exercises').insert(rows)
+      }
+    }
 
     setSessionType(''); setDurationMin(''); setSessionNotes(''); setSessionItems([])
+    setDate(new Date().toISOString().split('T')[0])
     loadSessions(user.id); loadExerciseHistory(user.id)
   }
 
@@ -412,24 +515,36 @@ export default function SportPage() {
   }
 
   const formatSetDisplay = (ex: DBExerciseRow) => {
+    const unit = ex.duration_unit || 'min'
     const cat = ex.exercises_library?.category
     if (cat === 'cardio') {
-      return [ex.intensity_zone, ex.duration_min && `${ex.duration_min}min`].filter(Boolean).join(' · ')
+      return [ex.intensity_zone, ex.duration_min && `${ex.duration_min}${unit}`].filter(Boolean).join(' · ')
     }
     if (cat === 'mobilite') {
-      return ex.duration_min ? `${ex.duration_min}min` : ''
+      return ex.duration_min ? `${ex.duration_min}${unit}` : ''
     }
     if (ex.contraction_type === 'isometrique') {
-      return [ex.weight_kg && `${ex.weight_kg}kg`, ex.duration_min && `${ex.duration_min}min`, ex.rpe && `RPE${ex.rpe}`].filter(Boolean).join(' · ')
+      return [ex.weight_kg && `${ex.weight_kg}kg`, ex.duration_min && `${ex.duration_min}${unit}`, ex.rpe && `RPE${ex.rpe}`].filter(Boolean).join(' · ')
     }
     return [ex.weight_kg && `${ex.weight_kg}kg`, ex.reps && `${ex.reps}r`, ex.rpe && `RPE${ex.rpe}`].filter(Boolean).join(' · ')
   }
 
   const formatHistorySet = (s: HistorySet) => {
-    return [s.weight_kg && `${s.weight_kg}kg`, s.reps && `${s.reps}r`, s.duration_min && `${s.duration_min}min`, s.rpe && `RPE${s.rpe}`, s.intensity_zone].filter(Boolean).join('·')
+    const unit = s.duration_unit || 'min'
+    return [s.weight_kg && `${s.weight_kg}kg`, s.reps && `${s.reps}r`, s.duration_min && `${s.duration_min}${unit}`, s.rpe && `RPE${s.rpe}`, s.intensity_zone].filter(Boolean).join('·')
   }
 
   // ─── RENDER HELPERS ───
+
+  const DurationToggle = ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
+    <div className="flex gap-1">
+      {['sec', 'min'].map((u) => (
+        <button key={u} onClick={() => onChange(u)}
+          className={`px-2 py-1 rounded-lg text-[10px] transition-all ${value === u ? 'bg-[var(--accent-blue)]/20 text-[var(--accent-blue)] ring-1 ring-[var(--accent-blue)]' : 'bg-[var(--bg-card)] text-[var(--text-tertiary)]'}`}
+        >{u}</button>
+      ))}
+    </div>
+  )
 
   const renderMusculOptions = (
     contraction: string, equipment: string, unilateral: boolean,
@@ -462,17 +577,18 @@ export default function SportPage() {
     if (block.category === 'cardio') {
       return (
         <>
-          <div className="grid grid-cols-3 gap-2 mb-1 text-[10px] text-[var(--text-tertiary)] px-1">
-            <span>Zone</span><span>Durée (min)</span><span></span>
+          <div className="grid grid-cols-[1fr_1fr_auto_auto] gap-2 mb-1 text-[10px] text-[var(--text-tertiary)] px-1">
+            <span>Zone</span><span>Durée</span><span></span><span></span>
           </div>
           {block.sets.map((set, si) => (
-            <div key={si} className="grid grid-cols-3 gap-2 mb-2 items-center">
+            <div key={si} className="grid grid-cols-[1fr_1fr_auto_auto] gap-2 mb-2 items-center">
               <select value={set.intensity_zone} onChange={(e) => updateSet(blockIndex, si, 'intensity_zone', e.target.value)} className="p-2 rounded-lg text-xs">
                 <option value="">—</option>
                 {zones.map((z) => <option key={z} value={z}>{z}</option>)}
               </select>
-              <input type="number" placeholder="min" value={set.duration_min} onChange={(e) => updateSet(blockIndex, si, 'duration_min', e.target.value)} className="p-2 rounded-lg text-sm text-center" />
-              <button onClick={() => removeSet(blockIndex, si)} className="text-[var(--accent-red)]/50 hover:text-[var(--accent-red)] text-xs justify-self-center">✕</button>
+              <input type="number" placeholder="—" value={set.duration_min} onChange={(e) => updateSet(blockIndex, si, 'duration_min', e.target.value)} className="p-2 rounded-lg text-sm text-center" />
+              <DurationToggle value={set.duration_unit || 'min'} onChange={(v) => updateSet(blockIndex, si, 'duration_unit', v)} />
+              <button onClick={() => removeSet(blockIndex, si)} className="text-[var(--accent-red)]/50 hover:text-[var(--accent-red)] text-xs">✕</button>
             </div>
           ))}
         </>
@@ -482,34 +598,35 @@ export default function SportPage() {
     if (block.category === 'mobilite') {
       return (
         <>
-          <div className="grid grid-cols-2 gap-2 mb-1 text-[10px] text-[var(--text-tertiary)] px-1">
-            <span>Durée (min)</span><span></span>
+          <div className="grid grid-cols-[1fr_auto_auto] gap-2 mb-1 text-[10px] text-[var(--text-tertiary)] px-1">
+            <span>Durée</span><span></span><span></span>
           </div>
           {block.sets.map((set, si) => (
-            <div key={si} className="grid grid-cols-2 gap-2 mb-2 items-center">
-              <input type="number" placeholder="min" value={set.duration_min} onChange={(e) => updateSet(blockIndex, si, 'duration_min', e.target.value)} className="p-2 rounded-lg text-sm text-center" />
-              <button onClick={() => removeSet(blockIndex, si)} className="text-[var(--accent-red)]/50 hover:text-[var(--accent-red)] text-xs justify-self-start">✕</button>
+            <div key={si} className="grid grid-cols-[1fr_auto_auto] gap-2 mb-2 items-center">
+              <input type="number" placeholder="—" value={set.duration_min} onChange={(e) => updateSet(blockIndex, si, 'duration_min', e.target.value)} className="p-2 rounded-lg text-sm text-center" />
+              <DurationToggle value={set.duration_unit || 'min'} onChange={(v) => updateSet(blockIndex, si, 'duration_unit', v)} />
+              <button onClick={() => removeSet(blockIndex, si)} className="text-[var(--accent-red)]/50 hover:text-[var(--accent-red)] text-xs">✕</button>
             </div>
           ))}
         </>
       )
     }
 
-    // Muscu
     if (isIso) {
       return (
         <>
-          <div className="grid grid-cols-4 gap-2 mb-1 text-[10px] text-[var(--text-tertiary)] px-1">
-            <span>#</span><span>Kg</span><span>Durée</span><span>RPE</span>
+          <div className="grid grid-cols-[auto_1fr_1fr_auto_auto] gap-2 mb-1 text-[10px] text-[var(--text-tertiary)] px-1">
+            <span>#</span><span>Kg</span><span>Durée</span><span></span><span>RPE</span>
           </div>
           {block.sets.map((set, si) => (
-            <div key={si} className="grid grid-cols-4 gap-2 mb-2 items-center">
+            <div key={si} className="grid grid-cols-[auto_1fr_1fr_auto_auto] gap-2 mb-2 items-center">
               <div className="flex items-center gap-1">
                 <span className="text-xs text-[var(--text-tertiary)] w-4">{si + 1}</span>
                 <button onClick={() => removeSet(blockIndex, si)} className="text-[var(--accent-red)]/50 hover:text-[var(--accent-red)] text-xs">✕</button>
               </div>
               <input type="number" placeholder="kg" value={set.weight_kg} onChange={(e) => updateSet(blockIndex, si, 'weight_kg', e.target.value)} className="p-2 rounded-lg text-sm text-center" />
-              <input type="number" placeholder="sec" value={set.duration_min} onChange={(e) => updateSet(blockIndex, si, 'duration_min', e.target.value)} className="p-2 rounded-lg text-sm text-center" />
+              <input type="number" placeholder="—" value={set.duration_min} onChange={(e) => updateSet(blockIndex, si, 'duration_min', e.target.value)} className="p-2 rounded-lg text-sm text-center" />
+              <DurationToggle value={set.duration_unit || 'sec'} onChange={(v) => updateSet(blockIndex, si, 'duration_unit', v)} />
               <select value={set.rpe} onChange={(e) => updateSet(blockIndex, si, 'rpe', e.target.value)} className="p-1.5 rounded-lg text-xs text-center">
                 <option value="">—</option>
                 {[1,2,3,4,5,6,7,8,9,10].map((r) => <option key={r} value={r.toString()}>{r}</option>)}
@@ -520,7 +637,6 @@ export default function SportPage() {
       )
     }
 
-    // Concentrique / Excentrique / Pliométrique
     return (
       <>
         <div className="grid grid-cols-4 gap-2 mb-1 text-[10px] text-[var(--text-tertiary)] px-1">
@@ -547,23 +663,37 @@ export default function SportPage() {
   const renderCircuitExerciseFields = (ex: CircuitExercise, ci: number, ei: number) => {
     if (ex.category === 'cardio') {
       return (
-        <div className="flex gap-2 mt-2">
-          <select value={ex.intensity_zone} onChange={(e) => updateCircuitExercise(ci, ei, 'intensity_zone', e.target.value)} className="p-2 rounded-lg text-xs flex-1">
-            <option value="">Zone</option>
-            {zones.map((z) => <option key={z} value={z}>{z}</option>)}
-          </select>
-          <input type="number" placeholder="min" value={ex.duration_min} onChange={(e) => updateCircuitExercise(ci, ei, 'duration_min', e.target.value)} className="p-2 rounded-lg text-sm text-center flex-1" />
+        <div className="grid grid-cols-[1fr_1fr_auto] gap-2 mt-2">
+          <div>
+            <label className="block text-[9px] text-[var(--text-tertiary)] mb-1 text-center">Zone</label>
+            <select value={ex.intensity_zone} onChange={(e) => updateCircuitExercise(ci, ei, 'intensity_zone', e.target.value)} className="w-full p-2 rounded-lg text-xs">
+              <option value="">—</option>
+              {zones.map((z) => <option key={z} value={z}>{z}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-[9px] text-[var(--text-tertiary)] mb-1 text-center">Durée</label>
+            <input type="number" placeholder="—" value={ex.duration_min} onChange={(e) => updateCircuitExercise(ci, ei, 'duration_min', e.target.value)} className="w-full p-2 rounded-lg text-sm text-center" />
+          </div>
+          <div>
+            <label className="block text-[9px] text-[var(--text-tertiary)] mb-1 text-center">&nbsp;</label>
+            <DurationToggle value={ex.duration_unit || 'min'} onChange={(v) => updateCircuitExercise(ci, ei, 'duration_unit', v)} />
+          </div>
         </div>
       )
     }
     if (ex.category === 'mobilite') {
       return (
-        <div className="mt-2">
-          <input type="number" placeholder="min" value={ex.duration_min} onChange={(e) => updateCircuitExercise(ci, ei, 'duration_min', e.target.value)} className="p-2 rounded-lg text-sm text-center w-24" />
+        <div className="flex gap-2 mt-2 items-end">
+          <div>
+            <label className="block text-[9px] text-[var(--text-tertiary)] mb-1">Durée</label>
+            <input type="number" placeholder="—" value={ex.duration_min} onChange={(e) => updateCircuitExercise(ci, ei, 'duration_min', e.target.value)} className="p-2 rounded-lg text-sm text-center w-20" />
+          </div>
+          <DurationToggle value={ex.duration_unit || 'min'} onChange={(v) => updateCircuitExercise(ci, ei, 'duration_unit', v)} />
         </div>
       )
     }
-    // Muscu
+
     const isIso = ex.contraction_type === 'isometrique'
     return (
       <div className="mt-2 space-y-2">
@@ -573,17 +703,31 @@ export default function SportPage() {
           (v) => updateCircuitExercise(ci, ei, 'equipment_type', v),
           (v) => updateCircuitExercise(ci, ei, 'is_unilateral', v),
         )}
-        <div className="flex gap-2">
-          <input type="number" placeholder="kg" value={ex.weight_kg} onChange={(e) => updateCircuitExercise(ci, ei, 'weight_kg', e.target.value)} className="p-2 rounded-lg text-sm text-center flex-1" />
-          {isIso ? (
-            <input type="number" placeholder="sec" value={ex.duration_min} onChange={(e) => updateCircuitExercise(ci, ei, 'duration_min', e.target.value)} className="p-2 rounded-lg text-sm text-center flex-1" />
-          ) : (
-            <input type="number" placeholder="reps" value={ex.reps} onChange={(e) => updateCircuitExercise(ci, ei, 'reps', e.target.value)} className="p-2 rounded-lg text-sm text-center flex-1" />
+        <div className={`grid ${isIso ? 'grid-cols-[1fr_1fr_auto_auto]' : 'grid-cols-3'} gap-2`}>
+          <div>
+            <label className="block text-[9px] text-[var(--text-tertiary)] mb-1 text-center">Kg</label>
+            <input type="number" placeholder="—" value={ex.weight_kg} onChange={(e) => updateCircuitExercise(ci, ei, 'weight_kg', e.target.value)} className="w-full p-2 rounded-lg text-sm text-center" />
+          </div>
+          <div>
+            <label className="block text-[9px] text-[var(--text-tertiary)] mb-1 text-center">{isIso ? 'Durée' : 'Reps'}</label>
+            {isIso ? (
+              <input type="number" placeholder="—" value={ex.duration_min} onChange={(e) => updateCircuitExercise(ci, ei, 'duration_min', e.target.value)} className="w-full p-2 rounded-lg text-sm text-center" />
+            ) : (
+              <input type="number" placeholder="—" value={ex.reps} onChange={(e) => updateCircuitExercise(ci, ei, 'reps', e.target.value)} className="w-full p-2 rounded-lg text-sm text-center" />
+            )}
+          </div>
+          {isIso && (
+            <div className="flex items-end">
+              <DurationToggle value={ex.duration_unit || 'sec'} onChange={(v) => updateCircuitExercise(ci, ei, 'duration_unit', v)} />
+            </div>
           )}
-          <select value={ex.rpe} onChange={(e) => updateCircuitExercise(ci, ei, 'rpe', e.target.value)} className="p-1.5 rounded-lg text-xs flex-1">
-            <option value="">RPE</option>
-            {[1,2,3,4,5,6,7,8,9,10].map((r) => <option key={r} value={r.toString()}>{r}</option>)}
-          </select>
+          <div>
+            <label className="block text-[9px] text-[var(--text-tertiary)] mb-1 text-center">RPE</label>
+            <select value={ex.rpe} onChange={(e) => updateCircuitExercise(ci, ei, 'rpe', e.target.value)} className="w-full p-2 rounded-lg text-xs text-center">
+              <option value="">—</option>
+              {[1,2,3,4,5,6,7,8,9,10].map((r) => <option key={r} value={r.toString()}>{r}</option>)}
+            </select>
+          </div>
         </div>
       </div>
     )
@@ -599,7 +743,12 @@ export default function SportPage() {
         <h1 className="text-3xl font-bold mb-8">🏋️ Sport</h1>
 
         <Card className="mb-5">
-          <h2 className="text-lg font-semibold mb-5">Nouvelle séance</h2>
+          <div className="flex justify-between items-center mb-5">
+            <h2 className="text-lg font-semibold">{editingSessionId ? 'Modifier la séance' : 'Nouvelle séance'}</h2>
+            {editingSessionId && (
+              <button onClick={cancelEditing} className="text-xs text-[var(--text-tertiary)] hover:underline">Annuler</button>
+            )}
+          </div>
           <div className="space-y-5">
 
             {/* Date & Duration */}
@@ -670,7 +819,7 @@ export default function SportPage() {
                 )}
               </div>
 
-              {/* Session items (exercises + circuits) */}
+              {/* Session items */}
               {sessionItems.map((item, index) => {
                 if (item.type === 'exercise') {
                   const block = item as ExerciseBlock
@@ -681,7 +830,6 @@ export default function SportPage() {
                         <button onClick={() => removeBlock(index)} className="text-[var(--accent-red)] text-xs hover:underline">Supprimer</button>
                       </div>
 
-                      {/* Badges */}
                       <div className="flex flex-wrap gap-1 mb-2 text-[9px]">
                         {block.category === 'muscu' && block.contraction_type && (
                           <span className="px-1.5 py-0.5 bg-[var(--accent-purple)]/10 text-[var(--accent-purple)] rounded">{contractionTypes.find((c) => c.value === block.contraction_type)?.label}</span>
@@ -694,14 +842,12 @@ export default function SportPage() {
                         )}
                       </div>
 
-                      {/* History */}
                       {exerciseHistory[block.exercise_id] && (
                         <div className="bg-[var(--bg-card)] p-2 rounded-lg mb-3 text-[10px] text-[var(--text-tertiary)]">
                           📋 Dernière ({new Date(exerciseHistory[block.exercise_id].date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}) : {exerciseHistory[block.exercise_id].sets.map((s, i) => `S${i + 1}: ${formatHistorySet(s)}`).join(' · ')}
                         </div>
                       )}
 
-                      {/* Muscu options */}
                       {block.category === 'muscu' && renderMusculOptions(
                         block.contraction_type, block.equipment_type, block.is_unilateral,
                         (v) => updateBlock(index, { contraction_type: v } as Partial<ExerciseBlock>),
@@ -709,7 +855,6 @@ export default function SportPage() {
                         (v) => updateBlock(index, { is_unilateral: v } as Partial<ExerciseBlock>),
                       )}
 
-                      {/* Sets */}
                       {renderSetRows(block, index)}
 
                       <button onClick={() => addSet(index)} className="text-xs text-[var(--accent-purple)] mt-1 hover:underline">+ Ajouter une série</button>
@@ -717,7 +862,6 @@ export default function SportPage() {
                   )
                 }
 
-                // Circuit
                 const circuit = item as CircuitBlock
                 return (
                   <motion.div key={index} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
@@ -733,7 +877,6 @@ export default function SportPage() {
                       <button onClick={() => removeBlock(index)} className="text-[var(--accent-red)] text-xs hover:underline">Supprimer</button>
                     </div>
 
-                    {/* Circuit exercises */}
                     {circuit.exercises.map((ex, ei) => (
                       <div key={ei} className="bg-[var(--bg-card)] rounded-lg p-3 mb-2">
                         <div className="flex justify-between items-center">
@@ -744,7 +887,6 @@ export default function SportPage() {
                       </div>
                     ))}
 
-                    {/* Add exercise to circuit */}
                     <div className="space-y-2 mt-3">
                       <select value={circuitSelGroup[index] || ''} onChange={(e) => { setCircuitSelGroup({ ...circuitSelGroup, [index]: e.target.value }); setCircuitSelExercise({ ...circuitSelExercise, [index]: '' }) }} className="w-full p-2 rounded-lg text-xs">
                         <option value="">-- Groupe --</option>
@@ -771,7 +913,7 @@ export default function SportPage() {
 
             <motion.button whileTap={{ scale: 0.97 }} onClick={submitSession} disabled={!sessionType}
               className="w-full bg-[var(--accent-red)] text-white font-medium p-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-30"
-            >Enregistrer la séance</motion.button>
+            >{editingSessionId ? 'Modifier la séance' : 'Enregistrer la séance'}</motion.button>
           </div>
         </Card>
 
@@ -792,11 +934,11 @@ export default function SportPage() {
                       </span>
                       <div className="flex items-center gap-3">
                         {session.duration_min && <span className="text-[var(--text-tertiary)] text-xs">{session.duration_min} min</span>}
+                        <button onClick={() => startEditing(session)} className="text-[var(--accent-purple)] text-xs hover:underline">✏️</button>
                         <button onClick={() => deleteSession(session.id)} className="text-[var(--accent-red)]/50 hover:text-[var(--accent-red)] text-xs transition-colors">✕</button>
                       </div>
                     </div>
 
-                    {/* Regular exercises */}
                     {regular.map((group, gi) => (
                       <div key={gi} className="ml-2 mb-2">
                         <div className="flex items-center gap-1">
@@ -815,7 +957,6 @@ export default function SportPage() {
                       </div>
                     ))}
 
-                    {/* Circuits */}
                     {circuits.map((circuit, ci) => (
                       <div key={ci} className="ml-2 mb-2 border-l-2 border-[var(--accent-green)]/30 pl-2">
                         <span className="text-xs font-medium text-[var(--accent-green)]">🔁 Circuit · {circuit.rounds} tours</span>

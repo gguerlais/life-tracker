@@ -10,6 +10,8 @@ import Card from '../../components/Card'
 import BodyMap from '../../components/BodyMap'
 import { motion } from 'framer-motion'
 
+// ─── TYPES ───
+
 type SessionRow = {
   id: string
   date: string
@@ -23,6 +25,8 @@ type ExerciseSetRow = {
   weight_kg: number | null
   duration_min: number | null
   rpe: number | null
+  equipment_type: string | null
+  is_unilateral: boolean
   exercises_library: { name: string; category: string; muscle_group: string } | null
   sport_sessions: { date: string; user_id: string } | null
 }
@@ -33,6 +37,16 @@ type RecordEntry = {
   date: string
 }
 
+type VariantRecords = {
+  label: string
+  rm1: RecordEntry | null
+  rm3: RecordEntry | null
+  rm5: RecordEntry | null
+  rm12: RecordEntry | null
+}
+
+// ─── CONSTANTS ───
+
 const tooltipStyle = {
   backgroundColor: '#1c1c1e',
   border: '1px solid #2c2c2e',
@@ -41,6 +55,12 @@ const tooltipStyle = {
   color: '#f5f5f7',
   fontSize: '12px',
 }
+
+const equipLabels: Record<string, string> = {
+  barre: 'Barre', kb_db: 'KB/DB', machine: 'Machine', poids_du_corps: 'PDC',
+}
+
+// ─── COMPONENT ───
 
 function SportAnalyticsContent() {
   const [user, setUser] = useState<User | null>(null)
@@ -58,9 +78,11 @@ function SportAnalyticsContent() {
   const [allSets, setAllSets] = useState<ExerciseSetRow[]>([])
   const [doneExercises, setDoneExercises] = useState<{ id: string; name: string }[]>([])
   const [selectedExercise, setSelectedExercise] = useState('')
-  const [records, setRecords] = useState<{ rm1: RecordEntry | null; rm3: RecordEntry | null; rm5: RecordEntry | null; rm12: RecordEntry | null } | null>(null)
+  const [variantRecords, setVariantRecords] = useState<VariantRecords[]>([])
 
   const router = useRouter()
+
+  // ─── LOAD ───
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -143,7 +165,7 @@ function SportAnalyticsContent() {
   const loadAllTimeSets = async (userId: string) => {
     const { data } = await supabase
       .from('sport_session_exercises')
-      .select('exercise_id, reps, weight_kg, duration_min, rpe, exercises_library ( name, category, muscle_group ), sport_sessions!inner ( user_id, date )')
+      .select('exercise_id, reps, weight_kg, duration_min, rpe, equipment_type, is_unilateral, exercises_library ( name, category, muscle_group ), sport_sessions!inner ( user_id, date )')
       .eq('sport_sessions.user_id', userId)
 
     if (data) {
@@ -164,29 +186,57 @@ function SportAnalyticsContent() {
     }
   }
 
+  // ─── HALL OF FAME ───
+
   useEffect(() => {
-    if (!selectedExercise || allSets.length === 0) { setRecords(null); return }
+    if (!selectedExercise || allSets.length === 0) { setVariantRecords([]); return }
 
     const sets = allSets.filter((s) => s.exercise_id === selectedExercise && s.weight_kg && s.reps)
 
-    const findRM = (minReps: number): RecordEntry | null => {
-      const eligible = sets.filter((s) => (s.reps || 0) >= minReps)
-      if (eligible.length === 0) return null
-      const best = eligible.reduce((max, s) => (s.weight_kg || 0) > (max.weight_kg || 0) ? s : max)
-      return {
-        weight: best.weight_kg || 0,
-        reps: best.reps || 0,
-        date: (best.sport_sessions as unknown as { date: string })?.date || '',
-      }
+    // Grouper par variante (equipment + unilateral)
+    const variants = new Map<string, ExerciseSetRow[]>()
+    for (const s of sets) {
+      const equip = s.equipment_type || 'autre'
+      const uni = s.is_unilateral ? 'uni' : 'bi'
+      const key = `${equip}_${uni}`
+      if (!variants.has(key)) variants.set(key, [])
+      variants.get(key)!.push(s)
     }
 
-    setRecords({ rm1: findRM(1), rm3: findRM(3), rm5: findRM(5), rm12: findRM(12) })
+    const results: VariantRecords[] = []
+    for (const [key, variantSets] of variants) {
+      const [equip, uni] = key.split('_')
+      const parts = []
+      if (equipLabels[equip]) parts.push(equipLabels[equip])
+      if (uni === 'uni') parts.push('Unilatéral')
+      const label = parts.length > 0 ? parts.join(' · ') : 'Standard'
+
+      const findRM = (minReps: number): RecordEntry | null => {
+        const eligible = variantSets.filter((s) => (s.reps || 0) >= minReps)
+        if (eligible.length === 0) return null
+        const best = eligible.reduce((max, s) => (s.weight_kg || 0) > (max.weight_kg || 0) ? s : max)
+        return {
+          weight: best.weight_kg || 0,
+          reps: best.reps || 0,
+          date: (best.sport_sessions as unknown as { date: string })?.date || '',
+        }
+      }
+
+      results.push({ label, rm1: findRM(1), rm3: findRM(3), rm5: findRM(5), rm12: findRM(12) })
+    }
+
+    results.sort((a, b) => (b.rm1?.weight || 0) - (a.rm1?.weight || 0))
+    setVariantRecords(results)
   }, [selectedExercise, allSets])
+
+  // ─── HELPERS ───
 
   const formatWeight = (kg: number) => {
     if (kg >= 1000) return `${(kg / 1000).toFixed(1)}T`
     return `${kg}kg`
   }
+
+  // ─── RENDER ───
 
   if (loading) return <div className="min-h-screen flex items-center justify-center">Chargement...</div>
 
@@ -290,7 +340,7 @@ function SportAnalyticsContent() {
         {/* Hall of Fame */}
         <Card className="mb-5" delay={0.2}>
           <h2 className="text-base font-semibold mb-1">🏆 Hall of Fame</h2>
-          <p className="text-[11px] text-[var(--text-tertiary)] mb-4">Records personnels (tous temps)</p>
+          <p className="text-[11px] text-[var(--text-tertiary)] mb-4">Records personnels par variante (tous temps)</p>
 
           <select value={selectedExercise} onChange={(e) => setSelectedExercise(e.target.value)} className="w-full p-3 rounded-xl text-sm mb-4">
             <option value="">-- Sélectionner un exercice --</option>
@@ -299,40 +349,40 @@ function SportAnalyticsContent() {
             ))}
           </select>
 
-          {records && (
-            <div className="space-y-3">
-              {[
-                { label: '1RM', data: records.rm1, emoji: '🥇', desc: 'Max sur 1 rep' },
-                { label: '3RM', data: records.rm3, emoji: '🥈', desc: 'Max sur 3 reps' },
-                { label: '5RM', data: records.rm5, emoji: '🥉', desc: 'Max sur 5 reps' },
-                { label: '12RM', data: records.rm12, emoji: '📊', desc: 'Max sur 12 reps' },
-              ].map((rm) => (
-                <motion.div key={rm.label} initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }}
-                  className="flex items-center justify-between bg-[var(--bg-secondary)] p-4 rounded-xl"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-xl">{rm.emoji}</span>
-                    <div>
-                      <p className="font-semibold text-sm">{rm.label}</p>
-                      <p className="text-[10px] text-[var(--text-tertiary)]">{rm.desc}</p>
-                    </div>
+          {variantRecords.length > 0 && (
+            <div className="space-y-5">
+              {variantRecords.map((variant, vi) => (
+                <motion.div key={vi} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: vi * 0.1 }}>
+                  <p className="text-xs font-semibold text-[var(--accent-purple)] mb-2">{variant.label}</p>
+                  <div className="space-y-2">
+                    {[
+                      { label: '1RM', data: variant.rm1, emoji: '🥇' },
+                      { label: '3RM', data: variant.rm3, emoji: '🥈' },
+                      { label: '5RM', data: variant.rm5, emoji: '🥉' },
+                      { label: '12RM', data: variant.rm12, emoji: '📊' },
+                    ].map((rm) => (
+                      rm.data && (
+                        <div key={rm.label} className="flex items-center justify-between bg-[var(--bg-secondary)] p-3 rounded-xl">
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg">{rm.emoji}</span>
+                            <span className="text-sm font-medium">{rm.label}</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-base font-bold">{rm.data.weight}kg</span>
+                            <span className="text-[10px] text-[var(--text-tertiary)] ml-2">
+                              {rm.data.reps}r · {new Date(rm.data.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                            </span>
+                          </div>
+                        </div>
+                      )
+                    ))}
                   </div>
-                  {rm.data ? (
-                    <div className="text-right">
-                      <p className="text-lg font-bold text-[var(--text-primary)]">{rm.data.weight}kg</p>
-                      <p className="text-[10px] text-[var(--text-tertiary)]">
-                        {rm.data.reps}r · {new Date(rm.data.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
-                      </p>
-                    </div>
-                  ) : (
-                    <span className="text-[var(--text-tertiary)] text-sm">—</span>
-                  )}
                 </motion.div>
               ))}
             </div>
           )}
 
-          {selectedExercise && !records && (
+          {selectedExercise && variantRecords.length === 0 && (
             <p className="text-[var(--text-tertiary)] text-sm text-center">Aucune donnée pour cet exercice</p>
           )}
         </Card>

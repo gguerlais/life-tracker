@@ -94,7 +94,7 @@ export default function AnalyticsPage() {
       setSportSessions(sport.length)
       let weight = 0
       let cardio = 0
-      for (const session of sport as SportSessionWithExercises[]) {
+      for (const session of sport as unknown as SportSessionWithExercises[]) {
         for (const ex of session.sport_session_exercises) {
           const cat = ex.exercises_library?.category
           if (cat === 'cardio' && ex.duration_min) {

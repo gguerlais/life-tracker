@@ -435,23 +435,23 @@ export default function SportPage() {
     contraction: string, equipment: string, unilateral: boolean,
     onContraction: (v: string) => void, onEquipment: (v: string) => void, onUnilateral: (v: boolean) => void,
   ) => (
-    <div className="space-y-2 mb-3">
-      <div className="flex gap-1 flex-wrap">
+    <div className="space-y-3 mb-4">
+      <div className="flex gap-2 flex-wrap">
         {contractionTypes.map((ct) => (
           <button key={ct.value} onClick={() => onContraction(ct.value)}
-            className={`px-2 py-1 rounded-lg text-[10px] transition-all ${contraction === ct.value ? 'bg-[var(--accent-purple)]/20 ring-1 ring-[var(--accent-purple)] text-[var(--accent-purple)]' : 'bg-[var(--bg-card)] text-[var(--text-tertiary)]'}`}
+            className={`px-3 py-2 rounded-xl text-xs transition-all ${contraction === ct.value ? 'bg-[var(--accent-purple)]/20 ring-1 ring-[var(--accent-purple)] text-[var(--accent-purple)]' : 'bg-[var(--bg-card)] text-[var(--text-tertiary)]'}`}
           >{ct.label}</button>
         ))}
       </div>
-      <div className="flex gap-1 flex-wrap">
+      <div className="flex gap-2 flex-wrap">
         {equipmentTypes.map((eq) => (
           <button key={eq.value} onClick={() => onEquipment(eq.value)}
-            className={`px-2 py-1 rounded-lg text-[10px] transition-all ${equipment === eq.value ? 'bg-[var(--accent-blue)]/20 ring-1 ring-[var(--accent-blue)] text-[var(--accent-blue)]' : 'bg-[var(--bg-card)] text-[var(--text-tertiary)]'}`}
+            className={`px-3 py-2 rounded-xl text-xs transition-all ${equipment === eq.value ? 'bg-[var(--accent-blue)]/20 ring-1 ring-[var(--accent-blue)] text-[var(--accent-blue)]' : 'bg-[var(--bg-card)] text-[var(--text-tertiary)]'}`}
           >{eq.label}</button>
         ))}
       </div>
       <button onClick={() => onUnilateral(!unilateral)}
-        className={`px-2 py-1 rounded-lg text-[10px] transition-all ${unilateral ? 'bg-[var(--accent-orange)]/20 ring-1 ring-[var(--accent-orange)] text-[var(--accent-orange)]' : 'bg-[var(--bg-card)] text-[var(--text-tertiary)]'}`}
+        className={`px-3 py-2 rounded-xl text-xs transition-all ${unilateral ? 'bg-[var(--accent-orange)]/20 ring-1 ring-[var(--accent-orange)] text-[var(--accent-orange)]' : 'bg-[var(--bg-card)] text-[var(--text-tertiary)]'}`}
       >🔄 Unilatéral</button>
     </div>
   )

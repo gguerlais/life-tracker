@@ -218,6 +218,22 @@ export default function AnalyticsPage() {
           </Card>
         </motion.div>
 
+        {/* Dashboard / Insights — clickable */}
+        <motion.div whileTap={{ scale: 0.98 }} onClick={() => router.push('/analytics/insights')}>
+          <Card className="mb-4 cursor-pointer hover:border-[var(--accent-purple)]/50 transition-colors" delay={0.17}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">📊</span>
+                <div>
+                  <p className="font-semibold text-sm">Dashboard</p>
+                  <p className="text-[11px] text-[var(--text-tertiary)]">Résumé hebdo + insights →</p>
+                </div>
+              </div>
+              <span className="text-[var(--text-tertiary)] text-lg">›</span>
+            </div>
+          </Card>
+        </motion.div>
+
         {/* Learning */}
         <Card className="mb-4" delay={0.2}>
           <div className="flex items-center justify-between">
